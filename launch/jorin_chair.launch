@@ -1,0 +1,59 @@
+<launch>
+
+<arg name="topic_name" default="scan"/>
+<arg name="frame_id" default="base_laser"/>
+<arg name="port_name" default="/dev/ttyUSB0"/>
+<arg name="port_baudrate" default="230400"/>
+<arg name="fix_to_base_link" default="true"/>
+
+  <!-- Transformation Configuration ... Setting Up the Relationships Between Coordinate Frames --> 
+  <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom 30" />
+  <node pkg="tf" type="static_transform_publisher" name="odom_to_base_link" args="0 0 0 0 0 0 odom base_footprint 30" />
+  <node pkg="tf" type="static_transform_publisher" name="base_link_broadcaster" args="0 0 0.09 0 0 0 base_footprint  base_link 30" />
+  <node name="base_to_laser" pkg="tf" type="static_transform_publisher"  args="0.0 0.0 0.18 0 0.0 0.0 base_link base_laser 50" if="$(arg fix_to_base_link)"/>
+  
+  	
+  <!-- Initial Pose and Goal Publisher -->
+  <!-- Publish: /initialpose, /move_base_simple/goal -->
+  <node pkg="rviz" type="rviz" name="rviz">
+  </node>
+
+  <!-- Subscribe: /initialpose, /move_base_simple/goal -->
+  <!-- Publish: /initial_2d, /goal_2d --> 
+  <node pkg="localization_data_pub" type="rviz_click_to_2d" name="rviz_click_to_2d">
+  </node>   
+
+ <node name="LD06" pkg="ldlidar_stl_ros" type="ldlidar_stl_ros_node" output="screen" >
+  <param name="product_name" value="LDLiDAR_LD06"/>
+  <param name="frame_id" value="$(arg frame_id)"/>
+  <param name="port_name" value ="$(arg port_name)"/>
+  <param name="topic_name" value="$(arg topic_name)"/>
+  <param name="port_baudrate" value ="$(arg port_baudrate)"/>
+  <param name="angle_crop_min" type="double" value="90.0"/>
+  <param name="angle_crop_max" type="double" value="90.0"/>
+ </node>
+ 
+  <!-- Map File -->
+  <arg name="map_file" default="/home/loyola/SocialTech_ws/src/SocialTech-Gazebo/maps/mymap.yaml"/>
+	
+  <!-- Map Server -->
+  <!-- Publish: /map, /map_metadata -->
+  <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)" />
+	
+  <!-- Add AMCL example for differential drive robots for Localization -->
+  <!-- Subscribe: /scan, /tf, /initialpose, /map -->
+  <!-- Publish: /amcl_pose, /particlecloud, /tf -->
+  <include file="$(find amcl)/examples/amcl_diff.launch"/>
+	
+  <!-- Move Base Node -->
+  <!-- Subscribe: /move_base_simple/goal -->
+  <!-- Publish: /cmd_vel -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam file="$(find navstack_pub)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find navstack_pub)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find navstack_pub)/param/local_costmap_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find navstack_pub)/param/global_costmap_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find navstack_pub)/param/base_local_planner_params.yaml" command="load" />
+  </node>
+
+</launch>
