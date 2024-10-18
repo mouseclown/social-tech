@@ -1,0 +1,61 @@
+<launch>
+  <include file="$(find tracer_base)/launch/tracer_base.launch" >
+      <arg name="port_name" default="can0" />
+      <arg name="simulated_robot" default="false" />
+  </include>
+
+<node
+    name="tf_footprint_base"
+    pkg="tf"
+    type="static_transform_publisher"
+    args="0 0 0 0 0 0 base_link base_footprint 30" />
+    
+<arg name="scan_topic" default="scan" />
+<arg name="joy_config" default="ps3" />
+<arg name="joy_dev" default="/dev/input/js0" />
+<arg name="config_filepath" default="$(find teleop_twist_joy)/config/$(arg joy_config).config.yaml" />
+<arg name="topic_name" default="base_scan"/>
+<arg name="frame_id" default="base_laser"/>
+<arg name="port_name" default="/dev/ttyUSB0"/>
+<arg name="port_baudrate" default="230400"/>
+<arg name="fix_to_base_link" default="true"/>
+
+ <node name="LD06" pkg="ldlidar_stl_ros" type="ldlidar_stl_ros_node" output="screen" >
+  <param name="product_name" value="LDLiDAR_LD06"/>
+  <param name="topic_name" value="$(arg topic_name)"/>
+  <param name="frame_id" value="$(arg frame_id)"/>
+  <param name="port_name" value ="$(arg port_name)"/>
+  <param name="port_baudrate" value ="$(arg port_baudrate)"/>
+  <param name="laser_scan_dir" type="bool" value="true"/>
+  <param name="enable_angle_crop_func" type="bool" value="true"/>
+  <param name="angle_crop_min" type="double" value="90"/>
+  <param name="angle_crop_max" type="double" value="90"/>
+ </node>
+ <node name="base_to_laser" pkg="tf" type="static_transform_publisher"  args="0.34 0.0 0.18 -1.57 0.0 0.0 base_link base_laser 40" if="$(arg fix_to_base_link)"/>
+  <node pkg="laser_filters" type="scan_to_scan_filter_chain"
+      name="laser_filter">
+    <rosparam command="load" file="$(find ldlidar_stl_ros)/launch/lidarfilter.yaml" />
+     <remap from="scan" to="base_scan" />
+     <remap from="scan_filtered" to="scan" />
+  </node>
+ 
+
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+   <param name="base_frame" value="base_footprint"/>
+  </node>
+  
+  <node pkg="joy" type="joy_node" name="joy_node">
+    	<param name="dev" value="$(arg joy_dev)" />
+    	<param name="deadzone" value="0.3" />
+    	<param name="autorepeat_rate" value="20" />
+  </node>
+
+  <node pkg="teleop_twist_joy" name="teleop_twist_joy" type="teleop_node">
+    <rosparam command="load" file="$(arg config_filepath)" />
+  </node>
+  
+ 
+ <node name="rviz" pkg="rviz" type="rviz" args="-d $(find navstack_pub)/rviz/model_display_map.rviz" />
+ 
+ 
+ </launch>
